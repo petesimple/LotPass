@@ -37,10 +37,18 @@ async function appsAction(action, extra = {}) {
     payload.set(key, value == null ? "" : value);
   });
 
-  const response = await fetch(APPS_SCRIPT_URL, { method: "POST", body: payload });
-  const json = await response.json();
-  if (!json.ok) throw new Error(json.error || "Request failed.");
-  return json;
+  const response = await fetch(APPS_SCRIPT_URL, {
+    method: "POST",
+    body: payload
+  });
+
+  const data = await response.json();
+
+  if (!data.ok) {
+    throw new Error(data.error || "Request failed.");
+  }
+
+  return data;
 }
 
 async function loadToday() {
@@ -48,16 +56,17 @@ async function loadToday() {
   list.innerHTML = "";
 
   try {
-    const json = await appsAction("listToday");
+    const data = await appsAction("listToday");
+    const rows = data.rows || [];
 
     message.innerHTML = `
       <div class="notice good">
-        Loaded ${json.rows.length} parking request(s) for ${escapeHtml(json.requestedDate || "today")}.<br>
-        Total rows seen by script: ${escapeHtml(json.totalRowsFound)}
+        Loaded ${rows.length} parking request(s) for ${escapeHtml(data.requestedDate || "today")}.<br>
+        Total rows seen by script: ${escapeHtml(data.totalRowsFound)}
       </div>
     `;
 
-    renderRows(json.rows);
+    renderRows(rows);
   } catch (err) {
     message.innerHTML = `<div class="notice bad">${escapeHtml(err.message)}</div>`;
   }
@@ -118,6 +127,7 @@ async function handleRowAction(event) {
         paymentMethod: "in_person",
         staffInitials: staffInput.value.trim()
       });
+
       message.innerHTML = `<div class="notice good">Marked paid: ${escapeHtml(passId)}</div>`;
       await loadToday();
       return;
@@ -126,6 +136,7 @@ async function handleRowAction(event) {
     if (action === "print" || action === "reprint") {
       await printPass(passId);
       await appsAction("markPrinted", { passId });
+
       message.innerHTML = `<div class="notice good">Printed: ${escapeHtml(passId)}</div>`;
       await loadToday();
       return;
@@ -134,6 +145,7 @@ async function handleRowAction(event) {
     if (action === "void") {
       const reason = prompt("Void reason?", "Voided by staff") || "Voided by staff";
       await appsAction("void", { passId, reason });
+
       message.innerHTML = `<div class="notice good">Voided: ${escapeHtml(passId)}</div>`;
       await loadToday();
       return;
@@ -144,19 +156,24 @@ async function handleRowAction(event) {
 }
 
 async function getCurrentRow(passId) {
-  const json = await appsAction("listToday");
-  return json.rows.find(r => r["Pass ID"] === passId);
+  const data = await appsAction("listToday");
+  const rows = data.rows || [];
+  return rows.find(r => r["Pass ID"] === passId);
 }
 
 async function printPass(passId) {
   const row = await getCurrentRow(passId);
-  if (!row) throw new Error("Could not find pass for printing.");
+
+  if (!row) {
+    throw new Error("Could not find pass for printing.");
+  }
 
   if (String(row["Payment Status"] || "").toLowerCase() !== "paid") {
     throw new Error("Mark this pass paid before printing.");
   }
 
   const base = printServerInput.value.trim().replace(/\/$/, "");
+
   const response = await fetch(base + "/print-parking-pass", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -175,8 +192,11 @@ async function printPass(passId) {
     })
   });
 
-  const json = await response.json();
-  if (!json.ok) throw new Error(json.error || "Printer failed.");
+  const data = await response.json();
+
+  if (!data.ok) {
+    throw new Error(data.error || "Printer failed.");
+  }
 }
 
 function escapeHtml(value) {

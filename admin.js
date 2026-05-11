@@ -44,17 +44,19 @@ async function appsAction(action, extra = {}) {
 }
 
 async function loadToday() {
-  message.innerHTML = `
-  <div class="notice good">
-    Loaded ${json.rows.length} parking request(s) for ${escapeHtml(json.requestedDate || "today")}.<br>
-    Total rows seen by script: ${escapeHtml(json.totalRowsFound)}
-  </div>
-`;
+  message.innerHTML = `<div class="notice">Loading today...</div>`;
   list.innerHTML = "";
 
   try {
     const json = await appsAction("listToday");
-    message.innerHTML = `<div class="notice good">Loaded ${json.rows.length} parking request(s).</div>`;
+
+    message.innerHTML = `
+      <div class="notice good">
+        Loaded ${json.rows.length} parking request(s) for ${escapeHtml(json.requestedDate || "today")}.<br>
+        Total rows seen by script: ${escapeHtml(json.totalRowsFound)}
+      </div>
+    `;
+
     renderRows(json.rows);
   } catch (err) {
     message.innerHTML = `<div class="notice bad">${escapeHtml(err.message)}</div>`;

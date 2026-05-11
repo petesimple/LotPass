@@ -16,11 +16,26 @@ staffInput.addEventListener("input", () => localStorage.setItem("lotpassStaffIni
 printServerInput.addEventListener("input", () => localStorage.setItem("lotpassPrintServerUrl", printServerInput.value));
 loadBtn.addEventListener("click", loadToday);
 
+function localDateKey() {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, "0");
+  const day = String(now.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
 async function appsAction(action, extra = {}) {
   const payload = new URLSearchParams();
   payload.set("action", action);
   payload.set("pin", pinInput.value.trim());
-  Object.entries(extra).forEach(([key, value]) => payload.set(key, value == null ? "" : value));
+
+  if (action === "listToday") {
+    payload.set("date", localDateKey());
+  }
+
+  Object.entries(extra).forEach(([key, value]) => {
+    payload.set(key, value == null ? "" : value);
+  });
 
   const response = await fetch(APPS_SCRIPT_URL, { method: "POST", body: payload });
   const json = await response.json();

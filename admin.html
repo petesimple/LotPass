@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>LotPass Admin</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <main class="wrap">
+    <h1>LotPass Admin</h1>
+    <p class="subtitle">Confirm payment, print dash passes, reprint, and void parking passes.</p>
+
+    <section class="card">
+      <div class="grid">
+        <div>
+          <label for="pin">Admin PIN</label>
+          <input id="pin" inputmode="numeric" placeholder="1234" />
+        </div>
+        <div>
+          <label for="staffInitials">Staff initials</label>
+          <input id="staffInitials" placeholder="PL" />
+        </div>
+      </div>
+
+      <label for="printServerUrl">Pi print server URL</label>
+      <input id="printServerUrl" value="http://192.168.1.31:3000" />
+
+      <button id="loadBtn">Load Today</button>
+      <div id="message"></div>
+      <div id="list" class="pass-list"></div>
+    </section>
+  </main>
+
+  <script src="admin.js"></script>
+</body>
+</html>

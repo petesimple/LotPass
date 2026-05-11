@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>LotPass Parking</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <main class="wrap">
+    <h1>LotPass</h1>
+    <p class="subtitle">Scan. Submit. Pay inside. Get your printed dash pass.</p>
+
+    <section class="card">
+      <div class="notice warn">
+        Your parking is not valid until payment is confirmed and a printed pass is placed on your dashboard.
+      </div>
+
+      <form id="parkingForm">
+        <label for="plate">License plate number</label>
+        <input id="plate" name="plate" autocomplete="off" required placeholder="ABC1234" />
+
+        <div class="grid">
+          <div>
+            <label for="vehicleColor">Vehicle color</label>
+            <input id="vehicleColor" name="vehicleColor" placeholder="Silver" />
+          </div>
+          <div>
+            <label for="vehicleMakeModel">Vehicle make/model</label>
+            <input id="vehicleMakeModel" name="vehicleMakeModel" placeholder="Toyota Camry" />
+          </div>
+        </div>
+
+        <label for="phone">Phone number optional</label>
+        <input id="phone" name="phone" inputmode="tel" placeholder="Optional" />
+
+        <label for="parkingType">Parking type</label>
+        <select id="parkingType" name="parkingType">
+          <option>Event Parking</option>
+          <option>Hourly Parking</option>
+          <option>Staff Comp</option>
+        </select>
+
+        <label for="notes">Notes optional</label>
+        <textarea id="notes" name="notes" placeholder="Spot number, special notes, etc."></textarea>
+
+        <button type="submit">Submit Parking Request</button>
+      </form>
+
+      <div id="result"></div>
+    </section>
+  </main>
+
+  <script src="parking.js"></script>
+</body>
+</html>

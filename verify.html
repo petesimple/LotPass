@@ -9,12 +9,25 @@
 <body>
   <main class="wrap">
     <h1>Verify Pass</h1>
-    <p class="subtitle">Scan result for a printed LotPass parking permit.</p>
-    <section class="card" id="verifyCard">
-      <div class="notice">Checking pass...</div>
+    <p class="subtitle">Scan a printed LotPass QR code or enter a pass ID manually.</p>
+
+    <section class="card" id="manualVerifyCard">
+      <h2>Enter Pass ID</h2>
+      <p class="meta">Example: PC-20260512-0001</p>
+
+      <form id="verifyForm">
+        <label for="manualPassId">Pass ID</label>
+        <input id="manualPassId" autocomplete="off" placeholder="PC-20260512-0001" />
+
+        <button type="submit">Verify Pass</button>
+      </form>
+    </section>
+
+    <section class="card" id="verifyCard" style="margin-top: 18px;">
+      <div class="notice">Enter a pass ID or scan a printed QR code.</div>
     </section>
   </main>
 
-  <script src="verify.js"></script>
+  <script src="verify.js?v=2"></script>
 </body>
 </html>

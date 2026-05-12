@@ -5,19 +5,83 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>LotPass Admin</title>
   <link rel="stylesheet" href="style.css" />
+
+  <style>
+    .admin-accordion {
+      padding: 0;
+      overflow: hidden;
+    }
+
+    .admin-accordion summary {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 14px;
+      padding: 20px 22px;
+      cursor: pointer;
+      list-style: none;
+    }
+
+    .admin-accordion summary::-webkit-details-marker {
+      display: none;
+    }
+
+    .admin-accordion summary strong {
+      display: block;
+      color: var(--text);
+      font-size: 1.15rem;
+    }
+
+    .admin-accordion summary small {
+      display: block;
+      margin-top: 4px;
+      color: var(--muted);
+      line-height: 1.35;
+    }
+
+    .accordion-icon {
+      display: grid;
+      place-items: center;
+      width: 34px;
+      height: 34px;
+      border-radius: 999px;
+      background: rgba(255,255,255,.08);
+      color: var(--muted);
+      font-weight: 1000;
+      flex: 0 0 auto;
+    }
+
+    .admin-accordion[open] .accordion-icon {
+      transform: rotate(45deg);
+      color: var(--text);
+    }
+
+    .admin-accordion .notice,
+    .admin-accordion form {
+      margin-left: 22px;
+      margin-right: 22px;
+    }
+
+    .admin-accordion form {
+      padding-bottom: 22px;
+    }
+  </style>
 </head>
+
 <body>
   <main class="wrap">
     <h1>LotPass Admin</h1>
-    <p class="subtitle">Create passes, confirm payment, print dash passes, reprint, and void parking passes.</p>
+    <p class="subtitle">Confirm payment, print dash passes, reprint, and void parking passes.</p>
 
     <section class="card">
       <h2>Staff Settings</h2>
+
       <div class="grid">
         <div>
           <label for="pin">Admin PIN</label>
           <input id="pin" inputmode="numeric" placeholder="1234" />
         </div>
+
         <div>
           <label for="staffInitials">Staff initials</label>
           <input id="staffInitials" placeholder="PL" />
@@ -28,10 +92,17 @@
       <input id="printServerUrl" value="http://192.168.1.31:3000" />
     </section>
 
-    <section class="card" style="margin-top: 18px;">
-      <h2>Add Parking Pass</h2>
+    <details class="card admin-accordion" style="margin-top: 18px;">
+      <summary>
+        <span>
+          <strong>Add Parking Pass</strong>
+          <small>Staff override for walk-ups, QR issues, or special cases</small>
+        </span>
+        <span class="accordion-icon">＋</span>
+      </summary>
+
       <div class="notice warn">
-        Use this when someone pays inside first, skips the QR, or needs staff help. This creates the pass directly from the admin side.
+        Use this only when someone pays inside first, skips the QR, or needs staff help. Most parking entries should come from the customer QR form.
       </div>
 
       <form id="adminAddForm">
@@ -43,6 +114,7 @@
             <label for="adminVehicleColor">Vehicle color</label>
             <input id="adminVehicleColor" name="vehicleColor" placeholder="Silver" />
           </div>
+
           <div>
             <label for="adminVehicleMakeModel">Vehicle make/model</label>
             <input id="adminVehicleMakeModel" name="vehicleMakeModel" placeholder="Toyota Camry" />
@@ -54,6 +126,7 @@
             <label for="adminPhone">Phone optional</label>
             <input id="adminPhone" name="phone" inputmode="tel" placeholder="Optional" />
           </div>
+
           <div>
             <label for="adminAmount">Amount</label>
             <input id="adminAmount" name="amount" inputmode="decimal" value="10" />
@@ -75,7 +148,7 @@
           <button type="button" id="addPaidBtn" class="good">Add Paid Pass</button>
         </div>
       </form>
-    </section>
+    </details>
 
     <section class="card" style="margin-top: 18px;">
       <h2>Today</h2>

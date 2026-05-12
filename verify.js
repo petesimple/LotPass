@@ -1,34 +1,56 @@
 const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxwA4In5-tBNeJKwVo41Qw-aNCLDmI0v59WB9qSVNnmI8Cad2bYl3EywQT_US8dI2QUWg/exec";
 
 const card = document.getElementById("verifyCard");
+const form = document.getElementById("verifyForm");
+const manualPassIdInput = document.getElementById("manualPassId");
+
 const params = new URLSearchParams(window.location.search);
-const passId = params.get("id") || params.get("passId") || "";
+const urlPassId = params.get("id") || params.get("passId") || "";
 
-verify();
+form.addEventListener("submit", event => {
+  event.preventDefault();
 
-async function verify() {
-  if (!passId) {
-    card.innerHTML = `<div class="notice bad">No pass ID provided.</div>`;
+  const manualPassId = manualPassIdInput.value.trim();
+
+  if (!manualPassId) {
+    card.innerHTML = `<div class="notice bad">Please enter a pass ID.</div>`;
     return;
   }
+
+  verify(manualPassId);
+});
+
+if (urlPassId) {
+  manualPassIdInput.value = urlPassId;
+  verify(urlPassId);
+}
+
+async function verify(passId) {
+  card.innerHTML = `<div class="notice">Checking pass...</div>`;
 
   try {
     const payload = new URLSearchParams();
     payload.set("action", "verify");
     payload.set("passId", passId);
 
-    const response = await fetch(APPS_SCRIPT_URL, { method: "POST", body: payload });
-    const json = await response.json();
+    const response = await fetch(APPS_SCRIPT_URL, {
+      method: "POST",
+      body: payload
+    });
 
-    if (!json.ok) throw new Error(json.error || "Verification failed.");
+    const data = await response.json();
 
-    if (!json.valid) {
+    if (!data.ok) {
+      throw new Error(data.error || "Verification failed.");
+    }
+
+    if (!data.valid) {
       card.innerHTML = `
         <div class="notice bad">
           <h2>INVALID PASS</h2>
-          Reason: ${escapeHtml(json.reason)}
+          Reason: ${escapeHtml(data.reason)}
         </div>
-        ${json.pass ? passDetails(json.pass) : ""}
+        ${data.pass ? passDetails(data.pass) : ""}
       `;
       return;
     }
@@ -38,7 +60,7 @@ async function verify() {
         <h2>VALID PARKING PASS</h2>
         This pass is paid and printed.
       </div>
-      ${passDetails(json.pass)}
+      ${passDetails(data.pass)}
     `;
   } catch (err) {
     card.innerHTML = `<div class="notice bad">${escapeHtml(err.message)}</div>`;

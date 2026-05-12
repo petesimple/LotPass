@@ -9,9 +9,10 @@
 <body>
   <main class="wrap">
     <h1>LotPass Admin</h1>
-    <p class="subtitle">Confirm payment, print dash passes, reprint, and void parking passes.</p>
+    <p class="subtitle">Create passes, confirm payment, print dash passes, reprint, and void parking passes.</p>
 
     <section class="card">
+      <h2>Staff Settings</h2>
       <div class="grid">
         <div>
           <label for="pin">Admin PIN</label>
@@ -25,13 +26,65 @@
 
       <label for="printServerUrl">Pi print server URL</label>
       <input id="printServerUrl" value="http://192.168.1.31:3000" />
+    </section>
 
+    <section class="card" style="margin-top: 18px;">
+      <h2>Add Parking Pass</h2>
+      <div class="notice warn">
+        Use this when someone pays inside first, skips the QR, or needs staff help. This creates the pass directly from the admin side.
+      </div>
+
+      <form id="adminAddForm">
+        <label for="adminPlate">License plate number</label>
+        <input id="adminPlate" name="plate" autocomplete="off" required placeholder="ABC1234" />
+
+        <div class="grid">
+          <div>
+            <label for="adminVehicleColor">Vehicle color</label>
+            <input id="adminVehicleColor" name="vehicleColor" placeholder="Silver" />
+          </div>
+          <div>
+            <label for="adminVehicleMakeModel">Vehicle make/model</label>
+            <input id="adminVehicleMakeModel" name="vehicleMakeModel" placeholder="Toyota Camry" />
+          </div>
+        </div>
+
+        <div class="grid">
+          <div>
+            <label for="adminPhone">Phone optional</label>
+            <input id="adminPhone" name="phone" inputmode="tel" placeholder="Optional" />
+          </div>
+          <div>
+            <label for="adminAmount">Amount</label>
+            <input id="adminAmount" name="amount" inputmode="decimal" value="10" />
+          </div>
+        </div>
+
+        <label for="adminParkingType">Parking type</label>
+        <select id="adminParkingType" name="parkingType">
+          <option>Event Parking</option>
+          <option>Hourly Parking</option>
+          <option>Staff Comp</option>
+        </select>
+
+        <label for="adminNotes">Notes optional</label>
+        <textarea id="adminNotes" name="notes" placeholder="Spot number, paid at bar, comp reason, etc."></textarea>
+
+        <div class="grid">
+          <button type="button" id="addPendingBtn" class="secondary">Add Pending</button>
+          <button type="button" id="addPaidBtn" class="good">Add Paid Pass</button>
+        </div>
+      </form>
+    </section>
+
+    <section class="card" style="margin-top: 18px;">
+      <h2>Today</h2>
       <button id="loadBtn">Load Today</button>
       <div id="message"></div>
       <div id="list" class="pass-list"></div>
     </section>
   </main>
 
-  <script src="admin.js"></script>
+  <script src="admin.js?v=3"></script>
 </body>
 </html>

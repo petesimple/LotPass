@@ -77,8 +77,16 @@
           </div>
         </div>
 
-        <label for="phone">Phone number optional</label>
-        <input id="phone" name="phone" inputmode="tel" placeholder="Optional" />
+        <label for="phone">Cell number</label>
+        <input
+          id="phone"
+          name="phone"
+          type="tel"
+          inputmode="tel"
+          autocomplete="tel"
+          required
+          placeholder="8325551234"
+        />
 
         <label for="parkingType">Parking type</label>
         <select id="parkingType" name="parkingType">

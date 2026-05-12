@@ -9,11 +9,17 @@
 <body>
   <main class="wrap">
     <h1>LotPass</h1>
-    <p class="subtitle">Scan. Submit. Pay inside. Get your printed dash pass.</p>
+    <p class="subtitle">Scan. Submit. Pay inside if needed. Get your parking logged.</p>
 
     <section class="card">
+      <div class="notice">
+        <strong>Daytime parking is free.</strong><br>
+        Paid parking starts at 6:00 PM Central and ends at 2:00 AM the next day.
+        If you are parking before 6:00 PM, submit your vehicle info and you are good until the paid parking window begins.
+      </div>
+
       <div class="notice warn">
-        Your parking is not valid until payment is confirmed and a printed pass is placed on your dashboard.
+        During paid parking hours, your parking is not valid until payment is confirmed and a printed pass is placed on your dashboard.
       </div>
 
       <form id="parkingForm">
@@ -51,6 +57,6 @@
     </section>
   </main>
 
-  <script src="parking.js"></script>
+  <script src="parking.js?v=2"></script>
 </body>
 </html>

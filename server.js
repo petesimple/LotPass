@@ -5,14 +5,22 @@
    Browser admin page sends JSON to:
    POST http://PI_IP:3000/print-parking-pass
 
-npm init -y
-npm install express cors escpos escpos-network qrcode
+   Setup:
 
-node server.js
+   npm init -y
+   npm install express cors escpos escpos-network qrcode
 
-pm2 start server.js --name lotpass-print-bridge
-pm2 save
+   Put business logo here:
+   ~/lotpass/assets/LOGO.JPG
 
+   Run:
+
+   node server.js
+
+   Or with PM2:
+
+   pm2 start server.js --name lotpass-print-bridge
+   pm2 save
 
 =========================================================== */
 
@@ -20,6 +28,8 @@ const express = require("express");
 const cors = require("cors");
 const escpos = require("escpos");
 const QRCode = require("qrcode");
+const fs = require("fs");
+const path = require("path");
 
 escpos.Network = require("escpos-network");
 
@@ -28,6 +38,8 @@ const SERVER_PORT = 3000;
 
 const PRINTER_IP = "192.168.1.229";
 const PRINTER_PORT = 9100;
+
+const LOGO_PATH = path.join(__dirname, "assets", "LOGO.JPG");
 
 app.use(cors());
 app.use(express.json({ limit: "3mb" }));
@@ -50,11 +62,58 @@ function printText(printer, text) {
   printer.text(String(text || ""));
 }
 
+function printImageFromFile(printer, filePath, imageType = "image/jpeg", mode = "d24") {
+  return new Promise((resolve, reject) => {
+    if (!fs.existsSync(filePath)) {
+      console.warn(`Logo file not found: ${filePath}`);
+      return resolve(false);
+    }
+
+    try {
+      const imageBuffer = fs.readFileSync(filePath);
+
+      escpos.Image.load(imageBuffer, imageType, (image) => {
+        printer
+          .align("ct")
+          .image(image, mode)
+          .then(() => resolve(true))
+          .catch(reject);
+      });
+    } catch (err) {
+      reject(err);
+    }
+  });
+}
+
+function printDataUrlImage(printer, dataUrl, imageType = "image/png", mode = "d24") {
+  return new Promise((resolve, reject) => {
+    if (!dataUrl) return resolve(false);
+
+    try {
+      const base64 = dataUrl.replace(/^data:image\/png;base64,/, "");
+      const imageBuffer = Buffer.from(base64, "base64");
+
+      escpos.Image.load(imageBuffer, imageType, (image) => {
+        printer
+          .align("ct")
+          .image(image, mode)
+          .then(() => resolve(true))
+          .catch(reject);
+      });
+    } catch (err) {
+      reject(err);
+    }
+  });
+}
+
 async function printParkingPass(payload) {
   const locationName = safeText(payload.locationName, "PARKING");
   const passId = safeText(payload.passId);
   const plate = safeText(payload.plate).toUpperCase();
-  const vehicle = [payload.vehicleColor, payload.vehicleMakeModel].map(v => safeText(v)).filter(Boolean).join(" ");
+  const vehicle = [payload.vehicleColor, payload.vehicleMakeModel]
+    .map(v => safeText(v))
+    .filter(Boolean)
+    .join(" ");
   const parkingType = safeText(payload.parkingType, "Event Parking");
   const amount = safeText(payload.amount);
   const validUntil = safeText(payload.validUntil, "Tonight");
@@ -69,10 +128,14 @@ async function printParkingPass(payload) {
   const { device, printer } = openPrinter();
 
   return new Promise((resolve, reject) => {
-    device.open((err) => {
+    device.open(async (err) => {
       if (err) return reject(err);
 
       try {
+        await printImageFromFile(printer, LOGO_PATH, "image/jpeg", "d24");
+
+        printer.feed(1);
+
         printer
           .align("ct")
           .style("b")
@@ -111,31 +174,23 @@ async function printParkingPass(payload) {
           .text("Scan QR to verify");
 
         if (qrDataUrl) {
-          const base64 = qrDataUrl.replace(/^data:image\/png;base64,/, "");
-          const imageBuffer = Buffer.from(base64, "base64");
-          escpos.Image.load(imageBuffer, "image/png", (image) => {
-            printer
-              .align("ct")
-              .image(image, "d24")
-              .then(() => {
-                printer
-                  .text(line("="))
-                  .feed(3)
-                  .cut()
-                  .close();
-                resolve();
-              })
-              .catch(reject);
-          });
-        } else {
-          printer
-            .text(line("="))
-            .feed(3)
-            .cut()
-            .close();
-          resolve();
+          await printDataUrlImage(printer, qrDataUrl, "image/png", "d24");
         }
+
+        printer
+          .text(line("="))
+          .feed(3)
+          .cut()
+          .close();
+
+        resolve();
       } catch (printErr) {
+        try {
+          printer.close();
+        } catch (closeErr) {
+          console.error("Printer close error:", closeErr);
+        }
+
         reject(printErr);
       }
     });
@@ -143,7 +198,12 @@ async function printParkingPass(payload) {
 }
 
 app.get("/health", (req, res) => {
-  res.json({ ok: true, service: "LotPass print bridge" });
+  res.json({
+    ok: true,
+    service: "LotPass print bridge",
+    logoPath: LOGO_PATH,
+    logoExists: fs.existsSync(LOGO_PATH)
+  });
 });
 
 app.post("/print-parking-pass", async (req, res) => {
@@ -152,11 +212,16 @@ app.post("/print-parking-pass", async (req, res) => {
     res.json({ ok: true });
   } catch (err) {
     console.error(err);
-    res.status(500).json({ ok: false, error: err.message || String(err) });
+    res.status(500).json({
+      ok: false,
+      error: err.message || String(err)
+    });
   }
 });
 
 app.listen(SERVER_PORT, "0.0.0.0", () => {
   console.log(`LotPass print bridge running on port ${SERVER_PORT}`);
   console.log(`Printer target: ${PRINTER_IP}:${PRINTER_PORT}`);
+  console.log(`Logo path: ${LOGO_PATH}`);
+  console.log(`Logo exists: ${fs.existsSync(LOGO_PATH)}`);
 });

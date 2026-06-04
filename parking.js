@@ -9,17 +9,23 @@ function cleanPlate(value) {
 
 form.addEventListener("submit", async (event) => {
   event.preventDefault();
+
   result.innerHTML = `<div class="notice">Submitting parking request...</div>`;
 
   const data = new FormData(form);
   const payload = new URLSearchParams();
+
   payload.set("action", "submit");
   payload.set("source", "public_form");
   payload.set("plate", cleanPlate(data.get("plate")));
   payload.set("vehicleColor", data.get("vehicleColor") || "");
   payload.set("vehicleMakeModel", data.get("vehicleMakeModel") || "");
   payload.set("phone", data.get("phone") || "");
-  payload.set("parkingType", data.get("parkingType") || "Event Parking");
+
+  // Public parking page should only submit one fixed parking type.
+  // This removes the need for a dropdown choice on this page.
+  payload.set("parkingType", "Event Parking");
+
   payload.set("notes", data.get("notes") || "");
 
   try {
@@ -27,11 +33,15 @@ form.addEventListener("submit", async (event) => {
       method: "POST",
       body: payload
     });
+
     const json = await response.json();
 
-    if (!json.ok) throw new Error(json.error || "Submission failed.");
+    if (!json.ok) {
+      throw new Error(json.error || "Submission failed.");
+    }
 
     form.reset();
+
     result.innerHTML = `
       <div class="notice good">
         <strong>Request received.</strong><br>

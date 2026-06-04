@@ -1,5 +1,7 @@
 const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxwA4In5-tBNeJKwVo41Qw-aNCLDmI0v59WB9qSVNnmI8Cad2bYl3EywQT_US8dI2QUWg/exec";
 
+const DEFAULT_PARKING_AMOUNT = "15";
+
 const pinInput = document.getElementById("pin");
 const staffInput = document.getElementById("staffInitials");
 const printServerInput = document.getElementById("printServerUrl");
@@ -9,32 +11,122 @@ const message = document.getElementById("message");
 const adminAddForm = document.getElementById("adminAddForm");
 const addPendingBtn = document.getElementById("addPendingBtn");
 const addPaidBtn = document.getElementById("addPaidBtn");
+const quickPrintBtn = document.getElementById("quickPrintBtn");
 
 pinInput.value = localStorage.getItem("lotpassAdminPin") || "";
 staffInput.value = localStorage.getItem("lotpassStaffInitials") || "";
 printServerInput.value = localStorage.getItem("lotpassPrintServerUrl") || printServerInput.value;
 
-pinInput.addEventListener("input", () => localStorage.setItem("lotpassAdminPin", pinInput.value));
-staffInput.addEventListener("input", () => localStorage.setItem("lotpassStaffInitials", staffInput.value));
-printServerInput.addEventListener("input", () => localStorage.setItem("lotpassPrintServerUrl", printServerInput.value));
+pinInput.addEventListener("input", () => {
+  localStorage.setItem("lotpassAdminPin", pinInput.value);
+});
+
+staffInput.addEventListener("input", () => {
+  localStorage.setItem("lotpassStaffInitials", staffInput.value);
+});
+
+printServerInput.addEventListener("input", () => {
+  localStorage.setItem("lotpassPrintServerUrl", printServerInput.value);
+});
+
 loadBtn.addEventListener("click", loadToday);
 addPendingBtn.addEventListener("click", () => addAdminPass(false));
 addPaidBtn.addEventListener("click", () => addAdminPass(true));
 
+if (quickPrintBtn) {
+  quickPrintBtn.addEventListener("click", quickPrintCashReceipt);
+}
+
 async function appsAction(action, extra = {}) {
   const payload = new URLSearchParams();
+
   payload.set("action", action);
   payload.set("pin", pinInput.value.trim());
-  Object.entries(extra).forEach(([key, value]) => payload.set(key, value == null ? "" : value));
 
-  const response = await fetch(APPS_SCRIPT_URL, { method: "POST", body: payload });
+  Object.entries(extra).forEach(([key, value]) => {
+    payload.set(key, value == null ? "" : value);
+  });
+
+  const response = await fetch(APPS_SCRIPT_URL, {
+    method: "POST",
+    body: payload
+  });
+
   const json = await response.json();
-  if (!json.ok) throw new Error(json.error || "Request failed.");
+
+  if (!json.ok) {
+    throw new Error(json.error || "Request failed.");
+  }
+
   return json;
 }
 
 function cleanPlate(value) {
   return String(value || "").toUpperCase().replace(/[^A-Z0-9]/g, "");
+}
+
+function makeQuickReceiptPlate() {
+  const now = new Date();
+
+  const y = now.getFullYear();
+  const m = String(now.getMonth() + 1).padStart(2, "0");
+  const d = String(now.getDate()).padStart(2, "0");
+  const h = String(now.getHours()).padStart(2, "0");
+  const min = String(now.getMinutes()).padStart(2, "0");
+  const s = String(now.getSeconds()).padStart(2, "0");
+
+  return `CASH${y}${m}${d}${h}${min}${s}`;
+}
+
+async function quickPrintCashReceipt() {
+  message.innerHTML = `<div class="notice">Creating quick cash receipt...</div>`;
+
+  try {
+    const staffInitials = staffInput.value.trim();
+
+    if (!staffInitials) {
+      throw new Error("Please enter staff initials before quick printing.");
+    }
+
+    const quickPlate = makeQuickReceiptPlate();
+
+    const submitData = await appsAction("submit", {
+      source: "quick_cash_receipt",
+      plate: quickPlate,
+      vehicleColor: "",
+      vehicleMakeModel: "",
+      phone: "",
+      parkingType: "Event Parking",
+      amount: DEFAULT_PARKING_AMOUNT,
+      notes: "Quick cash receipt. No vehicle info collected."
+    });
+
+    const passId = submitData.pass["Pass ID"];
+
+    await appsAction("markPaid", {
+      passId,
+      paymentMethod: "cash",
+      staffInitials
+    });
+
+    await printQuickReceipt(passId);
+
+    await appsAction("markPrinted", {
+      passId
+    });
+
+    message.innerHTML = `
+      <div class="notice good">
+        Quick cash receipt printed.<br>
+        Pass ID: ${escapeHtml(passId)}<br>
+        Amount: $${escapeHtml(DEFAULT_PARKING_AMOUNT)}
+      </div>
+    `;
+
+    await loadToday();
+  } catch (err) {
+    message.innerHTML = `<div class="notice bad">${escapeHtml(err.message)}</div>`;
+  }
 }
 
 async function addAdminPass(markPaidNow) {
@@ -55,7 +147,7 @@ async function addAdminPass(markPaidNow) {
       vehicleMakeModel: formData.get("vehicleMakeModel") || "",
       phone: formData.get("phone") || "",
       parkingType: formData.get("parkingType") || "Event Parking",
-      amount: formData.get("amount") || "10",
+      amount: formData.get("amount") || DEFAULT_PARKING_AMOUNT,
       notes: formData.get("notes") || ""
     });
 
@@ -70,9 +162,18 @@ async function addAdminPass(markPaidNow) {
     }
 
     adminAddForm.reset();
-    document.getElementById("adminAmount").value = "10";
 
-    message.innerHTML = `<div class="notice good">Added ${markPaidNow ? "paid" : "pending"} pass: ${escapeHtml(passId)}</div>`;
+    const amountInput = document.getElementById("adminAmount");
+    if (amountInput) {
+      amountInput.value = DEFAULT_PARKING_AMOUNT;
+    }
+
+    message.innerHTML = `
+      <div class="notice good">
+        Added ${markPaidNow ? "paid" : "pending"} pass: ${escapeHtml(passId)}
+      </div>
+    `;
+
     await loadToday();
   } catch (err) {
     message.innerHTML = `<div class="notice bad">${escapeHtml(err.message)}</div>`;
@@ -85,7 +186,13 @@ async function loadToday() {
 
   try {
     const json = await appsAction("listToday");
-    message.innerHTML = `<div class="notice good">Loaded ${json.rows.length} parking request(s).</div>`;
+
+    message.innerHTML = `
+      <div class="notice good">
+        Loaded ${json.rows.length} parking request(s).
+      </div>
+    `;
+
     renderRows(json.rows);
   } catch (err) {
     message.innerHTML = `<div class="notice bad">${escapeHtml(err.message)}</div>`;
@@ -99,6 +206,7 @@ function renderRows(rows) {
   }
 
   const sorted = rows.slice().reverse();
+
   list.innerHTML = sorted.map(rowHtml).join("");
 
   document.querySelectorAll("[data-action]").forEach(btn => {
@@ -111,14 +219,25 @@ function rowHtml(row) {
   const status = String(row["Status"] || "pending").toLowerCase();
   const paid = String(row["Payment Status"] || "unpaid").toLowerCase();
   const printed = String(row["Print Status"] || "not_printed").toLowerCase();
+  const source = String(row["Source"] || "").toLowerCase();
+
+  const isQuickReceipt =
+    source === "quick_cash_receipt" ||
+    String(row["Notes"] || "").toLowerCase().includes("quick cash receipt");
+
+  const plateText = isQuickReceipt ? "QUICK CASH RECEIPT" : row["Plate"];
+
+  const vehicleLine = isQuickReceipt
+    ? "No vehicle info collected"
+    : `${escapeHtml(row["Vehicle Color"])} ${escapeHtml(row["Vehicle Make Model"])}`;
 
   return `
     <article class="pass-card">
       <div class="pass-head">
         <div>
-          <div class="big-plate">${escapeHtml(row["Plate"])}</div>
+          <div class="big-plate">${escapeHtml(plateText)}</div>
           <div class="meta">
-            ${escapeHtml(row["Vehicle Color"])} ${escapeHtml(row["Vehicle Make Model"])}<br>
+            ${vehicleLine}<br>
             Pass: ${escapeHtml(passId)}<br>
             Type: ${escapeHtml(row["Parking Type"])} | Amount: $${escapeHtml(row["Amount"])}<br>
             Payment: ${escapeHtml(paid)} | Print: ${escapeHtml(printed)}
@@ -147,23 +266,53 @@ async function handleRowAction(event) {
         paymentMethod: "in_person",
         staffInitials: staffInput.value.trim()
       });
+
       message.innerHTML = `<div class="notice good">Marked paid: ${escapeHtml(passId)}</div>`;
+
       await loadToday();
       return;
     }
 
     if (action === "print" || action === "reprint") {
-      await printPass(passId);
-      await appsAction("markPrinted", { passId });
+      const row = await getCurrentRow(passId);
+
+      if (!row) {
+        throw new Error("Could not find pass for printing.");
+      }
+
+      const source = String(row["Source"] || "").toLowerCase();
+      const notes = String(row["Notes"] || "").toLowerCase();
+
+      const isQuickReceipt =
+        source === "quick_cash_receipt" ||
+        notes.includes("quick cash receipt");
+
+      if (isQuickReceipt) {
+        await printQuickReceipt(passId);
+      } else {
+        await printPass(passId);
+      }
+
+      await appsAction("markPrinted", {
+        passId
+      });
+
       message.innerHTML = `<div class="notice good">Printed: ${escapeHtml(passId)}</div>`;
+
       await loadToday();
       return;
     }
 
     if (action === "void") {
       const reason = prompt("Void reason?", "Voided by staff") || "Voided by staff";
-      await appsAction("void", { passId, reason });
+
+      await appsAction("void", {
+        passId,
+        reason
+      });
+
       message.innerHTML = `<div class="notice good">Voided: ${escapeHtml(passId)}</div>`;
+
       await loadToday();
       return;
     }
@@ -177,18 +326,66 @@ async function getCurrentRow(passId) {
   return json.rows.find(r => r["Pass ID"] === passId);
 }
 
+async function printQuickReceipt(passId) {
+  const row = await getCurrentRow(passId);
+
+  if (!row) {
+    throw new Error("Could not find quick receipt for printing.");
+  }
+
+  if (String(row["Payment Status"] || "").toLowerCase() !== "paid") {
+    throw new Error("Mark this receipt paid before printing.");
+  }
+
+  const base = printServerInput.value.trim().replace(/\/$/, "");
+
+  const response = await fetch(base + "/print-parking-pass", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({
+      quickReceipt: true,
+      printMode: "quick_cash_receipt",
+      locationName: row["Location Name"],
+      passId: row["Pass ID"],
+      plate: "",
+      vehicleColor: "",
+      vehicleMakeModel: "",
+      parkingType: row["Parking Type"] || "Event Parking",
+      amount: row["Amount"] || DEFAULT_PARKING_AMOUNT,
+      validUntil: row["Valid Until"],
+      verificationUrl: row["Verification URL"],
+      dailyPhrase: row["Daily Phrase"],
+      staffInitials: staffInput.value.trim()
+    })
+  });
+
+  const json = await response.json();
+
+  if (!json.ok) {
+    throw new Error(json.error || "Printer failed.");
+  }
+}
+
 async function printPass(passId) {
   const row = await getCurrentRow(passId);
-  if (!row) throw new Error("Could not find pass for printing.");
+
+  if (!row) {
+    throw new Error("Could not find pass for printing.");
+  }
 
   if (String(row["Payment Status"] || "").toLowerCase() !== "paid") {
     throw new Error("Mark this pass paid before printing.");
   }
 
   const base = printServerInput.value.trim().replace(/\/$/, "");
+
   const response = await fetch(base + "/print-parking-pass", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json"
+    },
     body: JSON.stringify({
       locationName: row["Location Name"],
       passId: row["Pass ID"],
@@ -205,7 +402,10 @@ async function printPass(passId) {
   });
 
   const json = await response.json();
-  if (!json.ok) throw new Error(json.error || "Printer failed.");
+
+  if (!json.ok) {
+    throw new Error(json.error || "Printer failed.");
+  }
 }
 
 function escapeHtml(value) {

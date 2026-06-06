@@ -65,6 +65,17 @@ function cleanPlate(value) {
   return String(value || "").toUpperCase().replace(/[^A-Z0-9]/g, "");
 }
 
+function fixLotPassUrl(value) {
+  return String(value || "").replace(
+    /https:\/\/petesimple\.github\.io\/lotpass/gi,
+    "https://petesimple.github.io/LotPass"
+  );
+}
+
+function getVerificationUrl(row) {
+  return fixLotPassUrl(row["Verification URL"]);
+}
+
 function makeQuickReceiptPlate() {
   const now = new Date();
 
@@ -355,7 +366,7 @@ async function printQuickReceipt(passId) {
       parkingType: row["Parking Type"] || "Event Parking",
       amount: row["Amount"] || DEFAULT_PARKING_AMOUNT,
       validUntil: row["Valid Until"],
-      verificationUrl: row["Verification URL"],
+      verificationUrl: getVerificationUrl(row),
       dailyPhrase: row["Daily Phrase"],
       staffInitials: staffInput.value.trim()
     })
@@ -395,7 +406,7 @@ async function printPass(passId) {
       parkingType: row["Parking Type"],
       amount: row["Amount"],
       validUntil: row["Valid Until"],
-      verificationUrl: row["Verification URL"],
+      verificationUrl: getVerificationUrl(row),
       dailyPhrase: row["Daily Phrase"],
       staffInitials: staffInput.value.trim()
     })

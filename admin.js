@@ -13,6 +13,22 @@ const addPendingBtn = document.getElementById("addPendingBtn");
 const addPaidBtn = document.getElementById("addPaidBtn");
 const quickPrintBtn = document.getElementById("quickPrintBtn");
 
+let allTicketRows = [];
+let currentPage = 1;
+const pageSize = 10;
+
+const searchWrap = document.createElement("div");
+searchWrap.className = "admin-search-wrap";
+searchWrap.innerHTML = `
+  <input id="ticketSearch" type="search" placeholder="Search tickets by plate, pass ID, phone, vehicle, notes..." />
+  <div id="ticketPager" class="ticket-pager"></div>
+`;
+
+list.parentNode.insertBefore(searchWrap, list);
+
+const ticketSearchInput = document.getElementById("ticketSearch");
+const ticketPager = document.getElementById("ticketPager");
+
 pinInput.value = localStorage.getItem("lotpassAdminPin") || "";
 staffInput.value = localStorage.getItem("lotpassStaffInitials") || "";
 printServerInput.value = localStorage.getItem("lotpassPrintServerUrl") || printServerInput.value;
@@ -36,6 +52,11 @@ addPaidBtn.addEventListener("click", () => addAdminPass(true));
 if (quickPrintBtn) {
   quickPrintBtn.addEventListener("click", quickPrintCashReceipt);
 }
+
+ticketSearchInput.addEventListener("input", () => {
+  currentPage = 1;
+  renderRows(allTicketRows);
+});
 
 async function appsAction(action, extra = {}) {
   const payload = new URLSearchParams();
@@ -87,6 +108,18 @@ function makeQuickReceiptPlate() {
   const s = String(now.getSeconds()).padStart(2, "0");
 
   return `CASH${y}${m}${d}${h}${min}${s}`;
+}
+
+function isQuickCashReceipt(row) {
+  const source = String(row["Source"] || "").toLowerCase();
+  const notes = String(row["Notes"] || "").toLowerCase();
+  const plate = String(row["Plate"] || "").toLowerCase();
+
+  return (
+    source === "quick_cash_receipt" ||
+    notes.includes("quick cash receipt") ||
+    plate.startsWith("cash")
+  );
 }
 
 async function quickPrintCashReceipt() {
@@ -194,34 +227,119 @@ async function addAdminPass(markPaidNow) {
 async function loadToday() {
   message.innerHTML = `<div class="notice">Loading today...</div>`;
   list.innerHTML = "";
+  ticketPager.innerHTML = "";
 
   try {
     const json = await appsAction("listToday");
 
+    allTicketRows = json.rows || [];
+
+    const cashCount = allTicketRows.filter(isQuickCashReceipt).length;
+    const infoCount = allTicketRows.length - cashCount;
+
     message.innerHTML = `
       <div class="notice good">
-        Loaded ${json.rows.length} parking request(s).
+        Loaded ${allTicketRows.length} parking request(s).<br>
+        Info tickets: ${infoCount} | Cash tickets: ${cashCount}
       </div>
     `;
 
-    renderRows(json.rows);
+    renderRows(allTicketRows);
   } catch (err) {
     message.innerHTML = `<div class="notice bad">${escapeHtml(err.message)}</div>`;
   }
 }
 
+function filterRows(rows) {
+  const query = ticketSearchInput.value.trim().toLowerCase();
+
+  if (!query) {
+    return rows;
+  }
+
+  return rows.filter(row => {
+    const searchable = [
+      row["Pass ID"],
+      row["Plate"],
+      row["Vehicle Color"],
+      row["Vehicle Make Model"],
+      row["Phone"],
+      row["Parking Type"],
+      row["Amount"],
+      row["Payment Status"],
+      row["Print Status"],
+      row["Status"],
+      row["Source"],
+      row["Notes"],
+      row["Valid Until"],
+      row["Daily Phrase"]
+    ].join(" ").toLowerCase();
+
+    return searchable.includes(query);
+  });
+}
+
 function renderRows(rows) {
   if (!rows.length) {
     list.innerHTML = `<div class="notice">No parking requests yet today.</div>`;
+    ticketPager.innerHTML = "";
     return;
   }
 
-  const sorted = rows.slice().reverse();
+  const filtered = filterRows(rows);
+  const sorted = filtered.slice().reverse();
+  const totalPages = Math.max(1, Math.ceil(sorted.length / pageSize));
 
-  list.innerHTML = sorted.map(rowHtml).join("");
+  if (currentPage > totalPages) {
+    currentPage = totalPages;
+  }
+
+  const startIndex = (currentPage - 1) * pageSize;
+  const pageRows = sorted.slice(startIndex, startIndex + pageSize);
+
+  if (!pageRows.length) {
+    list.innerHTML = `<div class="notice">No tickets match that search.</div>`;
+    ticketPager.innerHTML = "";
+    return;
+  }
+
+  list.innerHTML = pageRows.map(rowHtml).join("");
 
   document.querySelectorAll("[data-action]").forEach(btn => {
     btn.addEventListener("click", handleRowAction);
+  });
+
+  renderPager(sorted.length, totalPages);
+}
+
+function renderPager(totalRows, totalPages) {
+  if (totalRows <= pageSize) {
+    ticketPager.innerHTML = `
+      <div class="pager-info">
+        Showing ${totalRows} ticket(s)
+      </div>
+    `;
+    return;
+  }
+
+  ticketPager.innerHTML = `
+    <button type="button" data-page="prev" ${currentPage === 1 ? "disabled" : ""}>Previous</button>
+    <span class="pager-info">Page ${currentPage} of ${totalPages} | ${totalRows} ticket(s)</span>
+    <button type="button" data-page="next" ${currentPage === totalPages ? "disabled" : ""}>Next</button>
+  `;
+
+  ticketPager.querySelectorAll("[data-page]").forEach(btn => {
+    btn.addEventListener("click", () => {
+      if (btn.dataset.page === "prev") {
+        currentPage -= 1;
+      }
+
+      if (btn.dataset.page === "next") {
+        currentPage += 1;
+      }
+
+      renderRows(allTicketRows);
+    });
   });
 }
 
@@ -230,12 +348,8 @@ function rowHtml(row) {
   const status = String(row["Status"] || "pending").toLowerCase();
   const paid = String(row["Payment Status"] || "unpaid").toLowerCase();
   const printed = String(row["Print Status"] || "not_printed").toLowerCase();
-  const source = String(row["Source"] || "").toLowerCase();
 
-  const isQuickReceipt =
-    source === "quick_cash_receipt" ||
-    String(row["Notes"] || "").toLowerCase().includes("quick cash receipt");
-
+  const isQuickReceipt = isQuickCashReceipt(row);
   const plateText = isQuickReceipt ? "QUICK CASH RECEIPT" : row["Plate"];
 
   const vehicleLine = isQuickReceipt
@@ -291,14 +405,7 @@ async function handleRowAction(event) {
         throw new Error("Could not find pass for printing.");
       }
 
-      const source = String(row["Source"] || "").toLowerCase();
-      const notes = String(row["Notes"] || "").toLowerCase();
-
-      const isQuickReceipt =
-        source === "quick_cash_receipt" ||
-        notes.includes("quick cash receipt");
-
-      if (isQuickReceipt) {
+      if (isQuickCashReceipt(row)) {
         await printQuickReceipt(passId);
       } else {
         await printPass(passId);
@@ -360,11 +467,7 @@ async function printQuickReceipt(passId) {
       printMode: "quick_cash_receipt",
       locationName: row["Location Name"],
       passId: row["Pass ID"],
-
-      // This fake plate keeps the print server from throwing "Missing plate".
-      // The print server should hide it because quickReceipt is true.
       plate: row["Plate"] || "CASHRECEIPT",
-
       vehicleColor: "",
       vehicleMakeModel: "",
       parkingType: row["Parking Type"] || "Event Parking",

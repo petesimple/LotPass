@@ -360,7 +360,11 @@ async function printQuickReceipt(passId) {
       printMode: "quick_cash_receipt",
       locationName: row["Location Name"],
       passId: row["Pass ID"],
-      plate: "",
+
+      // This fake plate keeps the print server from throwing "Missing plate".
+      // The print server should hide it because quickReceipt is true.
+      plate: row["Plate"] || "CASHRECEIPT",
+
       vehicleColor: "",
       vehicleMakeModel: "",
       parkingType: row["Parking Type"] || "Event Parking",

@@ -3,6 +3,7 @@ const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxwA4In5-tBNeJK
 const form = document.getElementById("parkingForm");
 const result = document.getElementById("result");
 
+const plateInput = document.getElementById("plate");
 const quickPhotoBtn = document.getElementById("quickPhotoBtn");
 const platePhotoInput = document.getElementById("platePhotoInput");
 const platePhotoPreview = document.getElementById("platePhotoPreview");
@@ -10,6 +11,7 @@ const platePhotoPreview = document.getElementById("platePhotoPreview");
 let selectedPlatePhotoBase64 = "";
 let selectedPlatePhotoName = "";
 let quickPhotoMode = false;
+let scannedPlate = "";
 
 function cleanPlate(value) {
   return String(value || "").toUpperCase().replace(/[^A-Z0-9]/g, "");
@@ -18,6 +20,11 @@ function cleanPlate(value) {
 if (quickPhotoBtn && platePhotoInput) {
   quickPhotoBtn.addEventListener("click", () => {
     quickPhotoMode = true;
+
+    if (plateInput) {
+      plateInput.removeAttribute("required");
+    }
+
     platePhotoInput.click();
   });
 
@@ -29,16 +36,26 @@ if (quickPhotoBtn && platePhotoInput) {
     }
 
     try {
-      result.innerHTML = `<div class="notice">Preparing plate photo...</div>`;
+      result.innerHTML = `<div class="notice">Reading plate photo...</div>`;
 
       selectedPlatePhotoName = file.name || "plate-photo.jpg";
-      selectedPlatePhotoBase64 = await resizeImageToBase64(file, 1200, 0.82);
+      selectedPlatePhotoBase64 = await resizeImageToBase64(file, 1400, 0.9);
+
+      scannedPlate = await scanPlateFromImage(selectedPlatePhotoBase64);
+
+      if (plateInput && scannedPlate) {
+        plateInput.value = scannedPlate;
+      }
 
       if (platePhotoPreview) {
         platePhotoPreview.innerHTML = `
           <div class="notice good">
             <strong>Plate photo ready.</strong><br>
-            Submit below to send this quick parking request.
+            ${
+              scannedPlate
+                ? `Scanned plate: <strong>${escapeHtml(scannedPlate)}</strong><br>Please correct it if needed, then submit.`
+                : `Could not confidently scan the plate.<br>You can type it in, or submit and let the counter review the photo.`
+            }
             <br><br>
             <img
               src="${selectedPlatePhotoBase64}"
@@ -53,7 +70,7 @@ if (quickPhotoBtn && platePhotoInput) {
     } catch (err) {
       selectedPlatePhotoBase64 = "";
       selectedPlatePhotoName = "";
-      quickPhotoMode = false;
+      scannedPlate = "";
 
       result.innerHTML = `<div class="notice bad">${escapeHtml(err.message)}</div>`;
     }
@@ -68,17 +85,17 @@ form.addEventListener("submit", async (event) => {
   const data = new FormData(form);
   const typedPlate = cleanPlate(data.get("plate"));
 
+  if (!typedPlate && !selectedPlatePhotoBase64) {
+    result.innerHTML = `<div class="notice bad">Please enter a plate number or use Quick Photo Plate.</div>`;
+    return;
+  }
+
   const payload = new URLSearchParams();
 
   payload.set("action", "submit");
   payload.set("source", quickPhotoMode ? "public_quick_photo" : "public_form");
 
-  if (quickPhotoMode && selectedPlatePhotoBase64 && !typedPlate) {
-    payload.set("plate", "PHOTO");
-  } else {
-    payload.set("plate", typedPlate);
-  }
-
+  payload.set("plate", typedPlate || scannedPlate || "PHOTO");
   payload.set("vehicleColor", data.get("vehicleColor") || "");
   payload.set("vehicleMakeModel", data.get("vehicleMakeModel") || "");
   payload.set("phone", data.get("phone") || "");
@@ -88,12 +105,15 @@ form.addEventListener("submit", async (event) => {
   let notes = data.get("notes") || "";
 
   if (quickPhotoMode && selectedPlatePhotoBase64) {
-    notes = `QUICK PHOTO PLATE REVIEW${notes ? " | " + notes : ""}`;
+    notes = `QUICK PHOTO PLATE REVIEW${scannedPlate ? " | OCR: " + scannedPlate : ""}${notes ? " | " + notes : ""}`;
+
     payload.set("quickPhoto", "yes");
     payload.set("platePhotoBase64", selectedPlatePhotoBase64);
     payload.set("platePhotoName", selectedPlatePhotoName || "plate-photo.jpg");
+    payload.set("scannedPlate", scannedPlate || "");
   } else {
     payload.set("quickPhoto", "no");
+    payload.set("scannedPlate", "");
   }
 
   payload.set("notes", notes);
@@ -114,21 +134,18 @@ form.addEventListener("submit", async (event) => {
 
     selectedPlatePhotoBase64 = "";
     selectedPlatePhotoName = "";
+    scannedPlate = "";
     quickPhotoMode = false;
 
     if (platePhotoPreview) {
       platePhotoPreview.innerHTML = "";
     }
 
-    const quickMessage = json.pass && json.pass["Plate"] === "PHOTO"
-      ? "Your plate photo was received. Please go inside, pay at the counter, and pick up your printed dashboard pass."
-      : "Please go inside, pay at the counter, and pick up your printed dashboard pass.";
-
     result.innerHTML = `
       <div class="notice good">
         <strong>Request received.</strong><br>
         Pass ID: ${escapeHtml(json.pass["Pass ID"])}<br><br>
-        ${escapeHtml(quickMessage)}
+        Please go inside, pay at the counter, and pick up your printed dashboard pass.
       </div>
     `;
   } catch (err) {
@@ -136,7 +153,68 @@ form.addEventListener("submit", async (event) => {
   }
 });
 
-function resizeImageToBase64(file, maxWidth = 1200, quality = 0.82) {
+async function scanPlateFromImage(imageBase64) {
+  if (!window.Tesseract) {
+    return "";
+  }
+
+  const result = await Tesseract.recognize(imageBase64, "eng", {
+    tessedit_char_whitelist: "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+  });
+
+  const rawText = result && result.data && result.data.text
+    ? result.data.text
+    : "";
+
+  return findBestPlate(rawText);
+}
+
+function findBestPlate(text) {
+  const cleaned = String(text || "")
+    .toUpperCase()
+    .replace(/[^A-Z0-9\s]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  const chunks = cleaned.split(" ");
+
+  const candidates = [];
+
+  chunks.forEach(chunk => {
+    const plate = cleanPlate(chunk);
+
+    if (plate.length >= 4 && plate.length <= 8) {
+      candidates.push(plate);
+    }
+  });
+
+  const joined = cleanPlate(cleaned);
+
+  for (let size = 8; size >= 4; size--) {
+    for (let i = 0; i <= joined.length - size; i++) {
+      const possible = joined.slice(i, i + size);
+
+      if (/[A-Z]/.test(possible) && /[0-9]/.test(possible)) {
+        candidates.push(possible);
+      }
+    }
+  }
+
+  const texasStyle = candidates.find(value =>
+    value.length === 7 &&
+    /^[A-Z0-9]+$/.test(value) &&
+    /[A-Z]/.test(value) &&
+    /[0-9]/.test(value)
+  );
+
+  if (texasStyle) {
+    return texasStyle;
+  }
+
+  return candidates[0] || "";
+}
+
+function resizeImageToBase64(file, maxWidth = 1400, quality = 0.9) {
   return new Promise((resolve, reject) => {
     if (!file.type || !file.type.startsWith("image/")) {
       reject(new Error("Please choose a photo of the license plate."));

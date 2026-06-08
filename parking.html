@@ -3,7 +3,9 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
   <title>LotPass Parking</title>
+
   <link rel="stylesheet" href="style.css" />
 
   <style>
@@ -27,6 +29,62 @@
     .parking-title {
       margin: 0;
       line-height: 1;
+    }
+
+    .quick-photo-box {
+      margin: 18px 0;
+      padding: 16px;
+      border-radius: 18px;
+      border: 1px solid rgba(255,255,255,.16);
+      background: rgba(255,255,255,.06);
+    }
+
+    .quick-photo-title {
+      margin: 0 0 6px;
+      font-size: 1.1rem;
+    }
+
+    .quick-photo-copy {
+      margin: 0 0 14px;
+      opacity: .88;
+      line-height: 1.4;
+    }
+
+    .quick-photo-btn {
+      width: 100%;
+      margin: 0;
+      font-size: 1.05rem;
+    }
+
+    .plate-photo-preview {
+      margin-top: 14px;
+    }
+
+    .plate-preview-img {
+      display: block;
+      max-width: 100%;
+      margin-top: 12px;
+      border-radius: 14px;
+      border: 1px solid rgba(255,255,255,.22);
+      box-shadow: 0 12px 30px rgba(0,0,0,.25);
+    }
+
+    .ocr-pill {
+      display: inline-block;
+      margin-top: 8px;
+      padding: 6px 10px;
+      border-radius: 999px;
+      background: rgba(120, 214, 107, .18);
+      border: 1px solid rgba(120, 214, 107, .35);
+      font-weight: 700;
+      letter-spacing: .04em;
+    }
+
+    .small-help {
+      margin-top: 6px;
+      font-size: .92rem;
+      opacity: .82;
+      line-height: 1.35;
     }
 
     @media (max-width: 520px) {
@@ -63,14 +121,46 @@
       </div>
 
       <form id="parkingForm">
+        <div class="quick-photo-box">
+          <h2 class="quick-photo-title">Fast option</h2>
+          <p class="quick-photo-copy">
+            Take a picture of your license plate and LotPass will try to read it automatically.
+            You can still correct the plate before submitting.
+          </p>
+
+          <button type="button" id="quickPhotoBtn" class="quick-photo-btn">
+            📸 Quick Photo Plate
+          </button>
+
+          <input
+            type="file"
+            id="platePhotoInput"
+            accept="image/*"
+            capture="environment"
+            style="display:none"
+          />
+
+          <div id="platePhotoPreview" class="plate-photo-preview"></div>
+        </div>
+
         <label for="plate">License plate number</label>
-        <input id="plate" name="plate" autocomplete="off" required placeholder="ABC1234" />
+        <input
+          id="plate"
+          name="plate"
+          autocomplete="off"
+          placeholder="ABC1234"
+        />
+
+        <div class="small-help">
+          You can type your plate manually, or use Quick Photo above and let LotPass try to scan it.
+        </div>
 
         <div class="grid">
           <div>
             <label for="vehicleColor">Vehicle color</label>
             <input id="vehicleColor" name="vehicleColor" placeholder="Silver" />
           </div>
+
           <div>
             <label for="vehicleMakeModel">Vehicle make/model</label>
             <input id="vehicleMakeModel" name="vehicleMakeModel" placeholder="Toyota Camry" />
@@ -98,22 +188,6 @@
         <label for="notes">Notes optional</label>
         <textarea id="notes" name="notes" placeholder="Spot number, special notes, etc."></textarea>
 
-        <div class="quick-photo-box">
-  <button type="button" id="quickPhotoBtn" class="quick-photo-btn">
-    📸 Quick Photo Plate
-  </button>
-
-  <input
-    type="file"
-    id="platePhotoInput"
-    accept="image/*"
-    capture="environment"
-    style="display:none"
-  />
-
-  <div id="platePhotoPreview"></div>
-</div>
-        
         <button type="submit">Submit Parking Request</button>
       </form>
 
@@ -122,6 +196,6 @@
   </main>
 
   <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
-  <script src="parking.js?v=2"></script>
+  <script src="parking.js?v=3"></script>
 </body>
 </html>

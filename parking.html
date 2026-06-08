@@ -98,6 +98,22 @@
         <label for="notes">Notes optional</label>
         <textarea id="notes" name="notes" placeholder="Spot number, special notes, etc."></textarea>
 
+        <div class="quick-photo-box">
+  <button type="button" id="quickPhotoBtn" class="quick-photo-btn">
+    📸 Quick Photo Plate
+  </button>
+
+  <input
+    type="file"
+    id="platePhotoInput"
+    accept="image/*"
+    capture="environment"
+    style="display:none"
+  />
+
+  <div id="platePhotoPreview"></div>
+</div>
+        
         <button type="submit">Submit Parking Request</button>
       </form>
 

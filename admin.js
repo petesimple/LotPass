@@ -481,7 +481,7 @@ async function printQuickReceipt(passId) {
 
   const json = await response.json();
 
-  if (!json.ok) {
+  if (!(json.ok || json.Ok)) {
     throw new Error(json.error || "Printer failed.");
   }
 }
@@ -521,7 +521,7 @@ async function printPass(passId) {
 
   const json = await response.json();
 
-  if (!json.ok) {
+  if (!(json.ok || json.Ok)) {
     throw new Error(json.error || "Printer failed.");
   }
 }
